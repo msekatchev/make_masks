@@ -8,6 +8,8 @@ global drawing, rdrawing, img
 #TODO: undo button?
 #TODO: name window
 
+####annotate_dir("images/datasets/bolts", "_dyn", "train", 5, 10)
+####annotate_img("test/142.png",150,7)
 #Set up callbacks for drawing circles on click and drag, bound to left and middle mouse 
 def draw_circle(event,x,y,flags,param):
     global mouseX,mouseY
@@ -75,14 +77,31 @@ def annotate_img(img_path, size1, size2) :
 
     #Make mask same colour as drawing and output binarised image
     train_labels = img[:,:,:3]
-    lower = np.array([254,0,0], dtype = "uint16")
-    upper = np.array([255,0,0], dtype = "uint16")
-    mask = cv2.inRange(train_labels, lower, upper)
-    mask[mask < 250] = 0
-    mask[mask != 0 ] = 1
- 
+    lower_blue = np.array([254,0,0], dtype = "uint16")
+    upper_blue = np.array([255,0,0], dtype = "uint16")
+    mask_blue = cv2.inRange(train_labels, lower_blue, upper_blue)
+    mask_blue[mask_blue < 250] = 0
+    #mask_blue[mask_blue != 0 ] = 255
+    mask_blue[mask_blue != 0 ] = 1
+
+##NEW
+    lower_red = np.array([0,0,254], dtype = "uint16")
+    upper_red = np.array([0,0,255], dtype = "uint16")
+    mask_red = cv2.inRange(train_labels, lower_red, upper_red)
+    mask_red[mask_red < 250] = 0
+    #mask_red[mask_red != 0 ] = 255  
+    mask_red[mask_red != 0 ] = 2
+    #Add the masks together to get array of pixel labels
+    mask = np.add(mask_red, mask_blue)
+    #mask = cv2.bitwise_or(mask_red,mask_blue)
+    print(np.unique(mask))
+ ##eND NEW
+
     #save label in code directory
-    cv2.imwrite('label.png', mask )
+    cv2.imwrite('label.png', mask)
+    cv2.imwrite('labelred.png', mask_red)
+    cv2.imwrite('labelblue.png',mask_blue)
+    print(mask_red)
     cv2.destroyWindow('image')
     return
             
@@ -132,14 +151,16 @@ def annotate_dir(img_dir, dataset, subset, size1, size2) :
         upper_blue = np.array([255,0,0], dtype = "uint16")
         mask_blue = cv2.inRange(train_labels, lower_blue, upper_blue)
         mask_blue[mask_blue < 250] = 0
+        #mask_blue[mask_blue != 0 ] = 255
         mask_blue[mask_blue != 0 ] = 1
         
         lower_red = np.array([0,0,254], dtype = "uint16")
         upper_red = np.array([0,0,255], dtype = "uint16")
         mask_red = cv2.inRange(train_labels, lower_red, upper_red)
         mask_red[mask_red < 250] = 0
-        mask_red[mask_red != 0 ] = 2  
-        
+        #mask_red[mask_red != 0 ] = 255  
+        mask_red[mask_red != 0 ] = 2
+
         #Add the masks together to get array of pixel labels
         mask = np.add(mask_red, mask_blue)
         print(np.unique(mask))
