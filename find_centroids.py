@@ -2,6 +2,8 @@ import cv2
 import numpy as np
 from skimage import color, img_as_ubyte
 import os, sys
+import math
+#find_centroids("B.png")
 
 def find_centroids(img_path) :
 
@@ -17,10 +19,9 @@ def find_centroids(img_path) :
     pmts_gray = cv2.inRange(train_labels, lower_pmts, upper_pmts)
     bolts_gray = cv2.inRange(train_labels, lower_bolts, upper_bolts)
     img = cv2.cvtColor(bolts_gray,cv2.COLOR_GRAY2BGR)
-    cv2.imwrite("pmts_gray--4.png",pmts_gray)
-    cv2.imwrite("bolts_gray--4.png",bolts_gray)
-    cv2.imwrite("img--4.png",img)
-
+    #cv2.imwrite("pmts_gray--4.png",pmts_gray)
+    #cv2.imwrite("bolts_gray--4.png",bolts_gray)
+    #cv2.imwrite("img--4.png",img)
 
 
 
@@ -67,7 +68,7 @@ def find_centroids(img_path) :
         x = params[1]
         y = params[0]
         r = params[2]
-        L = int(r*1.1)
+        L = int(r*1.5)
         gray_image = image[x-L:x+L, y-L:y+L]
         ret,thresh = cv2.threshold(gray_image,127,255,0)
         gray_image = color.gray2rgb(img_as_ubyte(gray_image))
@@ -95,33 +96,125 @@ def find_centroids(img_path) :
                 continue
         return out
     ################################################################
-
+    
+    
+    
+    
+    ################################################################
+    # From a list of bolt positions and circle parameters, orders bolts in clockwise order starting from top over 360 degrees
+    
+    #returns a list of bolts in clockwise order 
+    def order_bolts(circle, bolt_ring) :
+        
+        out = []
+        
+        #circle parameters
+        circ_x = circle[0]
+        circ_y = circle[1]
+        circ_r = circle[2]
+        L = int(circ_r*1)  
+        
+        #bolt locations found beforehand
+        nodes = np.asarray(bolt_ring)
+        
+        #loop over 2pi in (60 for now) steps finding closest bolts
+        for i in np.linspace(0, 2*3.14159, num=60) : 
+            
+            #point on circle (scaled by radius of hough transform) to search near
+            search_x = int(circ_x + L*np.sin(i))
+            search_y = int(circ_y - L*np.cos(i))
+            
+            #find bolt closest to point
+            dist = np.sum((nodes - [search_y,search_x])**2, axis=1)
+            closest = np.argmin(dist)
+            
+            #only append each bolt coordinate once
+            if bolt_ring[closest] not in out :
+                out.append(bolt_ring[closest])
+               
+        return out
+    
+    ################################################################
 
 
 
 
     #find circles in image
     circles = find_pmts(pmts_gray)
-    bolt_centres = []
+
 
     #loop over circles and find bolts, end up with list of circles, each a list of bolts (no circle parameters are saved )
     for i in circles[0, :] :
         bolt_ring = ret_centres(bolts_gray, i)
-        bolt_centres.append(bolt_ring)
-    
+        bolts_ord = order_bolts(i, bolt_ring)
+        pmtID = input("Input PMT number:\n-->")
         #Draw hough circles on img
         cv2.circle(img,(i[0],i[1]),i[2],(0,255,0),2)
         cv2.circle(img,(i[0],i[1]),2,(0,255,0),3)
 
+        #draw bolt locations and number them 
+        bolt_no = 0
+        #print("I is ",i)
+        cv2.putText(img, pmtID, (i[0]-47, i[1]-10), cv2.FONT_HERSHEY_SIMPLEX, 1, (255,0,255), 1)
+        ######################### Automatic bolt number labelling on mask ##############################
+        radius = i[2]
+        for j in bolts_ord :
+            bolt_no += 1
+            
+            #Find the angle at the centre of the PMT between the x axis and 
+            #the line pointing from the centre of the PMT to the centre of the bolt
+            lengthx = j[1]-i[0]
+            lengthy = j[0]-i[1]
+            length = math.sqrt(lengthx**2+lengthy**2)
+            angle = np.arctan(lengthy/lengthx)
+            
+            #Calculate text location based on this angle and the location of the bolt along the circle.
+            
+            #bolt 1
+            if(bolt_no==1):
+                textx = int(j[1])
+                texty = int(j[0]-(radius/3))
+            #bolts 2 through 14 (on the right side of the circle/the 1st and 4th quadrant) 
+            elif(bolt_no<=12):
+                textx = int(j[1]+(radius/3.4)*np.cos(angle))
+                texty = int(j[0]+(radius/3.4)*np.sin(angle))
+            #bolt 13
+            elif(bolt_no==13):
+                textx = int(j[1]+(radius/3.4)*np.cos(angle))
+                texty = int(j[0]+abs((radius/3.4)*np.sin(angle)))
+            #bolts 14 through 19 (on the 3rd quadrant)
+            elif(bolt_no<=19):
+                textx = int(j[1]-(radius/2.4)*np.cos(angle))
+                texty = int(j[0]-(radius/2.4)*np.sin(angle))
+            #bolts 20 through 24 (on the 2nd quadrant)
+            else:
+                textx = int(j[1]-(radius/2.6)*np.cos(angle))
+                texty = int(j[0]-(radius/2.6)*np.sin(angle))
+            pointerx = int((textx+textx+20)/2)
+            pointery = int((texty+texty-20)/2)
+            cv2.line(img, (j[1],j[0]), (pointerx,pointery), (0,177,177), thickness=1, lineType=8, shift=0)
+            cv2.rectangle(img,(textx,texty),(textx+20,texty-20),(0,0,0), thickness=-1, lineType=8, shift=0)
+            
+            cv2.putText(img, f'{bolt_no}', (textx, texty), cv2.FONT_HERSHEY_SIMPLEX, 0.75, (255,0,255), 1)
+        
+        ######################### Automatic bolt number labelling on mask ##############################
+            
 
     #draw bolt locations
-    for i in bolt_centres :
-        for j in i :
-            cv2.circle(img, (j[1], j[0]), 5, (0,0,255), -1)
 
 
-    print(bolt_centres)
+    for i in bolts_ord :
+        print(i[0],i[1])
+        #for j in i :
+        cv2.circle(img, (i[1], i[0]), 5, (0,0,255), -1)
+            #print(j)
+
     print(circles)
     print("SAVING")
-    cv2.imwrite('out.png', img )
- 
+
+    base = os.path.basename(img_path)
+    filename = os.path.splitext(base)[0]
+    outputMaskName = os.path.join(filename+'-labelled.png')
+    print("Saving labelled output mask to: ",outputMaskName)
+    #save output mask in code directory
+    cv2.imwrite(outputMaskName, img)
