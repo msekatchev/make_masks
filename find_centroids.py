@@ -27,10 +27,6 @@ def find_centroids(img_path) :
 
 
 
-
-
-    #print('images made')
-
     #Calls HoughCircles() to find multiple PMTs in an image
 
     #Outpts list of circle parameters
@@ -45,9 +41,9 @@ def find_centroids(img_path) :
                                minRadius=100,
                                 maxRadius=200
                               )
-        #print(circles)
 
-        ##Error over here vvvv, because circles is empty.
+
+
         circles = np.uint16(np.around(circles))
         img2 = cv2.cvtColor(edges,cv2.COLOR_GRAY2BGR)
 
@@ -90,7 +86,6 @@ def find_centroids(img_path) :
                 cX = int(M["m10"] / M["m00"])
                 cY = int(M["m01"] / M["m00"])
                 out.append([cY + (x-L), cX + (y-L)])
-             #   print(area)
 
             else:
                 continue
@@ -156,6 +151,7 @@ def find_centroids(img_path) :
         bolt_no = 0
         #print("I is ",i)
         cv2.putText(img, pmtID, (i[0]-47, i[1]-10), cv2.FONT_HERSHEY_SIMPLEX, 1, (255,0,255), 1)
+        
         ######################### Automatic bolt number labelling on mask ##############################
         radius = i[2]
         for j in bolts_ord :
@@ -166,48 +162,51 @@ def find_centroids(img_path) :
             lengthx = j[1]-i[0]
             lengthy = j[0]-i[1]
             length = math.sqrt(lengthx**2+lengthy**2)
-            angle = np.arctan(lengthy/lengthx)
+            if(lengthx==0):
+                angle=3.1415926/2
+            else:
+                angle = np.arctan(lengthy/lengthx)
             
             #Calculate text location based on this angle and the location of the bolt along the circle.
             
             #bolt 1
             if(bolt_no==1):
                 textx = int(j[1])
-                texty = int(j[0]-(radius/3))
+                texty = int(j[0]-(32))
             #bolts 2 through 14 (on the right side of the circle/the 1st and 4th quadrant) 
             elif(bolt_no<=12):
-                textx = int(j[1]+(radius/3.4)*np.cos(angle))
-                texty = int(j[0]+(radius/3.4)*np.sin(angle))
+                textx = int(j[1]+(28)*np.cos(angle))
+                texty = int(j[0]+(28)*np.sin(angle))
             #bolt 13
             elif(bolt_no==13):
-                textx = int(j[1]+(radius/3.4)*np.cos(angle))
-                texty = int(j[0]+abs((radius/3.4)*np.sin(angle)))
+                textx = int(j[1]+abs((34)*np.cos(angle)))
+                texty = int(j[0]+abs((34)*np.sin(angle)))
             #bolts 14 through 19 (on the 3rd quadrant)
             elif(bolt_no<=19):
-                textx = int(j[1]-(radius/2.4)*np.cos(angle))
-                texty = int(j[0]-(radius/2.4)*np.sin(angle))
+                textx = int(j[1]-(40)*np.cos(angle))
+                texty = int(j[0]-(40)*np.sin(angle))
             #bolts 20 through 24 (on the 2nd quadrant)
             else:
-                textx = int(j[1]-(radius/2.6)*np.cos(angle))
-                texty = int(j[0]-(radius/2.6)*np.sin(angle))
+                textx = int(j[1]-(37)*np.cos(angle))
+                texty = int(j[0]-(37)*np.sin(angle))
             pointerx = int((textx+textx+20)/2)
             pointery = int((texty+texty-20)/2)
             cv2.line(img, (j[1],j[0]), (pointerx,pointery), (0,177,177), thickness=1, lineType=8, shift=0)
-            cv2.rectangle(img,(textx,texty),(textx+20,texty-20),(0,0,0), thickness=-1, lineType=8, shift=0)
-            
-            cv2.putText(img, f'{bolt_no}', (textx, texty), cv2.FONT_HERSHEY_SIMPLEX, 0.75, (255,0,255), 1)
-        
+
+            cv2.rectangle(img,(textx,texty),(textx+15,texty-15),(0,0,0), thickness=-1, lineType=8, shift=0)
+            #cv2.circle(img,(textx,texty),10,(0,0,0),-1)
+            cv2.circle(img, (j[1], j[0]), 5, (0,0,255), -1)
+            cv2.putText(img, f'{bolt_no}', (textx, texty), cv2.FONT_HERSHEY_SIMPLEX, 0.5, (255,0,255), 1)
         ######################### Automatic bolt number labelling on mask ##############################
             
 
     #draw bolt locations
 
 
-    for i in bolts_ord :
-        print(i[0],i[1])
-        #for j in i :
-        cv2.circle(img, (i[1], i[0]), 5, (0,0,255), -1)
-            #print(j)
+        #for i in bolts_ord :
+            print(j[0],j[1])
+            
+        
 
     print(circles)
     print("SAVING")
